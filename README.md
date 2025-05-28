@@ -2,6 +2,8 @@
 
 This tool batch-processes PDF documents using the **Mistral OCR API**, extracts Markdown per page, and handles embedded images by saving them and performing OCR on those as well.
 
+Markdown is useful for feeding the documents into RAG. Markdown works especially well for tables, and mathematical formulas, given Mistral OCR is really good at processing those. 
+
 ---
 
 ## 📁 Folder Structure
