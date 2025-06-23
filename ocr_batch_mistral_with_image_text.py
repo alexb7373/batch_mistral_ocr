@@ -2,8 +2,14 @@ import os
 import base64
 from pathlib import Path
 from mistralai import Mistral, DocumentURLChunk, ImageURLChunk
+from dotenv import load_dotenv
 from config.config import INPUT_DIR, OUTPUT_DIR  # ✅ import your paths
 
+env_path = Path(".env")
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+else:
+    raise FileNotFoundError(".env file not found")
 
 # Configuration
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
