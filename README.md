@@ -54,8 +54,8 @@ project-root/
    from pathlib import Path
 
    # On Windows use raw string (with r"") to avoid escaping backslashes
-   INPUT_DIR = Path(r"C:\Users\user\Desktop\pdf_files")
-   OUTPUT_DIR = Path(r"C:\Users\user\Desktop\pdf_files\out")
+   INPUT_DIR = r"C:\Users\user\Desktop\pdf_files" # # add .replace('C:\\', '/mnt/c/').replace('\\','/') for WSL
+   OUTPUT_DIR = r"C:\Users\user\Desktop\pdf_files\out"
    ```
 
    Add `config/` to your `.gitignore` to keep local paths out of version control.

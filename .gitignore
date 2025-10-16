@@ -1,3 +1,5 @@
-config/
+config/*
 wkng/
+__pycache__
 .env
+.venv/

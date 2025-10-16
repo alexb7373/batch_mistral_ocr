@@ -4,6 +4,9 @@ from pathlib import Path
 from mistralai import Mistral, DocumentURLChunk, ImageURLChunk
 from dotenv import load_dotenv
 from config.config import INPUT_DIR, OUTPUT_DIR  # ✅ import your paths
+INPUT_DIR = Path(INPUT_DIR)
+OUTPUT_DIR = Path(OUTPUT_DIR)
+print(INPUT_DIR, OUTPUT_DIR)
 
 env_path = Path(".env")
 if env_path.exists():
@@ -93,7 +96,7 @@ def process_pdf(pdf_path: Path):
 
                         ocr_text = ocr_image_to_text(img_path)
                         if ocr_text:
-                            page.markdown += f"\n\n**OCR Extracted Text from image:**\n{ocr_text}"
+                            page.markdown += f"\n\n**OCR Extracted Text from image:**\n{str(img_path).split('/')[-1]}\n{ocr_text.replace('[img-0.jpeg](img-0.jpeg)\n', '')}"
 
                     except Exception as e:
                         print(f"❌ Error processing image {i} on page {page_index} of {pdf_path.name}: {e}")
