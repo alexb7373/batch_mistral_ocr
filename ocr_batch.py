@@ -11,7 +11,8 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from mistralai import Mistral, DocumentURLChunk, ImageURLChunk
+from mistralai.client import Mistral
+from mistralai.client.models import DocumentURLChunk, ImageURLChunk
 
 try:
     from dotenv import load_dotenv
@@ -138,7 +139,7 @@ def ocr_image_to_text(image_path: Path) -> str:
         
         # Detect format for proper MIME type
         mime_type, _ = detect_image_format(encoded_img)
-        image_url = f"{mime_type};base64,{encoded_img}"
+        image_url = f"data:{mime_type};base64,{encoded_img}"
         
         response = client.ocr.process(
             model="mistral-ocr-latest",
