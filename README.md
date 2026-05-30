@@ -15,6 +15,8 @@ project-root/
 ├── pdfs/                 # Input folder for PDFs
 ├── output/               # Output folder for markdown and images
 ├── ocr_batch.py          # Main OCR batch processor
+├── requirements.txt      # Python dependencies
+├── AGENTS.md            # Agent-specific instructions
 └── README.md             # This file
 ```
 
@@ -25,6 +27,15 @@ project-root/
 1. **Clone the repository**
 
 2. **Install required dependencies**
+   
+   Using a virtual environment (recommended):
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/macOS
+   pip install -r requirements.txt
+   ```
+   
+   Or install globally (may require `--break-system-packages` on some systems):
    ```bash
    pip install mistralai python-dotenv
    ```
