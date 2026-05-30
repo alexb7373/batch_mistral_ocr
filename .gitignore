@@ -4,6 +4,7 @@ config/*
 
 # Output directories
 output/
+output_books/
 pdfs/
 
 # Temporary files
