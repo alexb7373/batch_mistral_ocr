@@ -26,11 +26,15 @@ project-root/
 
 2. **Install required dependencies**
    ```bash
-   pip install mistralai
+   pip install mistralai python-dotenv
    ```
 
 3. **Add your API key**
-   You can set the `MISTRAL_API_KEY` using:
+
+   The script will look for the `MISTRAL_API_KEY` in this order:
+   1. Environment variable (already set)
+   2. `../.env` (parent directory)
+   3. `./.env` (project directory)
 
    - **Linux/macOS**
      ```bash
@@ -47,16 +51,26 @@ project-root/
      $env:MISTRAL_API_KEY="your_actual_api_key"
      ```
 
-4. **Create config file**
+   - **Using .env file** (recommended)
+     Create a `.env` file in `~/projects/.env` (or in the project root):
+     ```
+     MISTRAL_API_KEY=your_actual_api_key
+     ```
+
+4. **Create config file (optional)**
    Create a file at `config/config.py`:
 
    ```python
    from pathlib import Path
 
    # On Windows use raw string (with r"") to avoid escaping backslashes
-   INPUT_DIR = r"C:\Users\user\Desktop\pdf_files" # # add .replace('C:\\', '/mnt/c/').replace('\\','/') for WSL
+   INPUT_DIR = r"C:\Users\user\Desktop\pdf_files"  # add .replace('C:\\', '/mnt/c/').replace('\\','/') for WSL
    OUTPUT_DIR = r"C:\Users\user\Desktop\pdf_files\out"
    ```
+
+   If you don't create this file, the script will use default directories:
+   - Input: `pdfs/`
+   - Output: `output/`
 
    Add `config/` to your `.gitignore` to keep local paths out of version control.
 
@@ -72,8 +86,9 @@ It will:
 
 - Process all PDFs in the `INPUT_DIR`
 - Output a `.md` file per PDF into the `OUTPUT_DIR`
-- Save all detected images as `.jpeg`
+- Save all detected images with their correct format (PNG, JPEG, etc.)
 - OCR image content and embed it in the markdown below the image reference
+- Provide a summary of processed, skipped, and failed files
 
 ---
 
@@ -90,13 +105,27 @@ Each output Markdown file contains:
 ## ❓FAQ
 
 ### What formats are supported?
-PDF input, JPEG image OCR output.
+PDF input, PNG/JPEG/GIF/WebP image OCR output (auto-detected).
 
 ### Can I run this headlessly on a server?
 Yes. Just set the `MISTRAL_API_KEY` and run the script.
 
 ### Can I use other image formats?
-Yes, with small code tweaks (e.g., detecting `png`, `webp` from base64 header).
+Yes! The script now automatically detects image formats (PNG, JPEG, GIF, WebP, BMP) from the base64 data and saves them with the correct extension.
+
+### The script crashes with "config/config.py not found"
+No problem! The script will fall back to using `pdfs/` as input and `output/` as output directories. You can also create the config file as shown above.
+
+---
+
+## 📊 Features
+
+- **Automatic image format detection** - No more hardcoded JPEG assumptions
+- **Flexible configuration** - Uses config file if present, defaults otherwise
+- **Multiple .env locations** - Checks parent directory, project directory, or environment variable
+- **Graceful error handling** - Continues processing other files if one fails
+- **Progress tracking** - Shows summary of processed, skipped, and failed files
+- **Robust markdown processing** - Handles missing markdown and null values safely
 
 ---
 

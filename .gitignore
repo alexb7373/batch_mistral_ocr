@@ -1,5 +1,21 @@
+# Local configuration
 config/*
+!config/.gitkeep
+
+# Output directories
+output/
+pdfs/
+
+# Temporary files
 wkng/
 __pycache__
+
+# Environment files
 .env
 .venv/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
