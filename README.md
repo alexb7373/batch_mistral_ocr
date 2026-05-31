@@ -10,15 +10,57 @@ Markdown is useful for feeding the documents into RAG. Markdown works especially
 
 ```
 project-root/
+├── src/                      # Main source code
+│   ├── __init__.py
+│   ├── config/
+│   │   ├── __init__.py
+│   │   └── settings.py        # Configuration management
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── types.py           # Type definitions
+│   ├── ocr/
+│   │   ├── __init__.py
+│   │   ├── client.py          # Mistral API client wrapper
+│   │   ├── processors.py      # PDF & image processors
+│   │   └── diagram_extractor.py # Diagram extraction
+│   └── utils/
+│       ├── __init__.py
+│       ├── file_utils.py      # File system utilities
+│       ├── image_utils.py     # Image format detection
+│       └── logging.py         # Progress tracking
 ├── config/
-│   └── config.py         # Local path config (git-ignored)
-├── pdfs/                 # Input folder for PDFs
-├── output/               # Output folder for markdown and images
-├── ocr_batch.py          # Main OCR batch processor
-├── requirements.txt      # Python dependencies
-├── AGENTS.md            # Agent-specific instructions
-└── README.md             # This file
+│   └── config.py            # Local path config (git-ignored)
+├── pdfs/                    # Input folder for PDFs
+├── output/                  # Output folder for markdown and images
+├── ocr_batch.py             # Thin CLI entry point
+├── requirements.txt         # Python dependencies
+├── AGENTS.md               # Agent-specific instructions
+└── README.md                # This file
 ```
+
+---
+
+## 🏗️ Architecture
+
+The project follows SOLID principles with a modular architecture:
+
+- **`src/config/`**: Configuration management (settings loading, validation)
+- **`src/models/`**: Type definitions and data structures
+- **`src/ocr/`**: OCR-specific functionality
+  - `client.py`: Mistral API client wrapper with retry logic
+  - `processors.py`: PDF and image processing logic
+  - `diagram_extractor.py`: Diagram detection and extraction
+- **`src/utils/`**: Utility functions
+  - `file_utils.py`: File system operations
+  - `image_utils.py`: Image format detection and processing
+  - `logging.py`: Progress tracking and reporting
+- **`ocr_batch.py`**: Thin CLI entry point that orchestrates the modules
+
+This architecture makes the code:
+- ✅ Easier to test (each module can be tested in isolation)
+- ✅ Easier to maintain (clear separation of concerns)
+- ✅ Easier to extend (add new features without modifying existing code)
+- ✅ More reliable (errors are contained within modules)
 
 ---
 
@@ -131,12 +173,15 @@ No problem! The script will fall back to using `pdfs/` as input and `output/` as
 
 ## 📊 Features
 
-- **Automatic image format detection** - No more hardcoded JPEG assumptions
+- **Automatic image format detection** - Detects PNG, JPEG, GIF, WebP, BMP from base64 data
+- **Diagram extraction** - Attempts to extract diagrams as Mermaid/ASCII art
 - **Flexible configuration** - Uses config file if present, defaults otherwise
 - **Multiple .env locations** - Checks parent directory, project directory, or environment variable
 - **Graceful error handling** - Continues processing other files if one fails
-- **Progress tracking** - Shows summary of processed, skipped, and failed files
+- **Retry logic** - Automatic retries for API failures
+- **Progress tracking** - Shows detailed summary of processed, skipped, and failed files
 - **Robust markdown processing** - Handles missing markdown and null values safely
+- **Modular architecture** - SOLID principles for maintainability
 
 ---
 
