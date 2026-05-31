@@ -51,7 +51,6 @@ def _load_local_config() -> Optional[tuple[Path, Path]]:
         config_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(config_module)
         return Path(config_module.INPUT_DIR), Path(config_module.OUTPUT_DIR)
-        return Path(INPUT_DIR), Path(OUTPUT_DIR)
     except Exception as e:
         print(f"⚠️  Could not load config/config.py: {e}")
         return None
@@ -63,16 +62,19 @@ def _load_env_vars() -> Optional[Path]:
     Returns:
         Path to .env file if found, None otherwise
     """
-    # Check parent directory first (../.env)
-    parent_env = Path("../.env")
-    if parent_env.exists():
-        return parent_env
+    package_root = Path(__file__).resolve().parents[2]
+    workspace_root = package_root.parent
+    candidates = [
+        Path.cwd() / ".env",
+        Path.cwd().parent / ".env",
+        package_root / ".env",
+        workspace_root / ".env",
+    ]
     
-    # Check local directory
-    local_env = Path("./.env")
-    if local_env.exists():
-        return local_env
-    
+    for env_path in candidates:
+        if env_path.exists():
+            return env_path
+
     return None
 
 
@@ -111,6 +113,11 @@ def _load_api_key() -> str:
         "MISTRAL_API_KEY not found. "
         "Set it in your environment or create a .env file in the project root or parent directory."
     )
+
+
+def load_api_key() -> str:
+    """Load Mistral API key from supported environment locations."""
+    return _load_api_key()
 
 
 def load_config() -> AppConfig:

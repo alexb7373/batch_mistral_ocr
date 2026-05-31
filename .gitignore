@@ -9,6 +9,7 @@ pdfs/
 
 # Temporary files
 wkng/
+runtime/
 __pycache__
 
 # Environment files

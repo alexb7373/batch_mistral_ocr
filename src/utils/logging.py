@@ -1,11 +1,13 @@
 """
-Progress tracking and logging utilities for Mistral OCR Batch Processor.
+Progress tracking and runtime manifest utilities for Mistral OCR Batch Processor.
 """
 
-import sys
-from typing import Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+from .runtime_manifest import RuntimeManifest
 
 
 @dataclass
@@ -51,33 +53,23 @@ class ProcessingStats:
 
 
 class ProgressTracker:
-    """Track and report processing progress.
-    
-    Provides verbose logging of processing status and collects statistics
-    for a final summary report.
-    
-    Attributes:
-        stats: Processing statistics
-        verbose: Whether to print progress messages
-    """
-    
-    def __init__(self, verbose: bool = True):
-        """Initialize progress tracker.
-        
-        Args:
-            verbose: Whether to show verbose output (default: True)
-        """
+    """Track processing progress and write it to a runtime manifest."""
+
+    def __init__(
+        self,
+        verbose: bool = True,
+        run_name: str = "ocr_batch",
+        runtime_dir: Optional[Path] = None,
+    ):
         self.stats = ProcessingStats()
-        self.verbose = verbose
         self._current_file: Optional[str] = None
+        self.verbose = verbose
+        self.manifest = RuntimeManifest(run_name=run_name, root_dir=runtime_dir)
     
     def start(self):
         """Start processing batch."""
         self.stats.start_time = datetime.now()
-        if self.verbose:
-            print("=" * 60)
-            print("🚀 Mistral OCR Batch Processor")
-            print("=" * 60)
+        self.manifest.record("start", started_at=self.stats.start_time.isoformat())
     
     def set_total(self, total: int):
         """Set total number of files to process.
@@ -86,20 +78,16 @@ class ProgressTracker:
             total: Total number of PDFs
         """
         self.stats.total = total
-        if self.verbose:
-            print(f"📚 Found {total} PDF(s) to process\n")
+        self.manifest.record("set_total", total=total)
     
     def set_input_output(self, input_dir: str, output_dir: str):
-        """Display input and output directories.
+        """Record input and output directories.
         
         Args:
             input_dir: Input directory path
             output_dir: Output directory path
         """
-        if self.verbose:
-            print(f"Input:  {input_dir}")
-            print(f"Output: {output_dir}")
-            print()
+        self.manifest.record("set_input_output", input_dir=input_dir, output_dir=output_dir)
     
     def start_file(self, filename: str):
         """Start processing a file.
@@ -108,8 +96,7 @@ class ProgressTracker:
             filename: Name of the file being processed
         """
         self._current_file = filename
-        if self.verbose:
-            print(f"🔍 Processing {filename}")
+        self.manifest.record("start_file", filename=filename)
     
     def complete_file(self, filename: str, success: bool = True):
         """Complete processing a file.
@@ -120,10 +107,9 @@ class ProgressTracker:
         """
         if success:
             self.stats.succeeded += 1
-            if self.verbose:
-                print(f"✅ Saved: {filename}")
         else:
             self.stats.failed += 1
+        self.manifest.record("complete_file", filename=filename, success=success)
     
     def skip_file(self, filename: str):
         """Skip a file (already processed).
@@ -132,8 +118,7 @@ class ProgressTracker:
             filename: Name of the file being skipped
         """
         self.stats.skipped += 1
-        if self.verbose:
-            print(f"⏭️  Skipping {filename}, already processed.")
+        self.manifest.record("skip_file", filename=filename)
     
     def extracted_image(self, filename: str):
         """Record image extraction.
@@ -142,8 +127,7 @@ class ProgressTracker:
             filename: Name of the extracted image
         """
         self.stats.images_extracted += 1
-        if self.verbose:
-            print(f"  🖼️  Saved image: {filename}")
+        self.manifest.record("extracted_image", filename=filename)
     
     def extracted_diagram(self, filename: str, model: str):
         """Record diagram extraction.
@@ -153,8 +137,7 @@ class ProgressTracker:
             model: OCR model used for extraction
         """
         self.stats.diagrams_extracted += 1
-        if self.verbose:
-            print(f"  📊 Extracted diagram from {filename} using {model}")
+        self.manifest.record("extracted_diagram", filename=filename, model=model)
     
     def error(self, message: str):
         """Log an error message.
@@ -162,8 +145,7 @@ class ProgressTracker:
         Args:
             message: Error message to display
         """
-        if self.verbose:
-            print(f"❌ {message}")
+        self.manifest.record("error", message=message)
     
     def warning(self, message: str):
         """Log a warning message.
@@ -171,8 +153,7 @@ class ProgressTracker:
         Args:
             message: Warning message to display
         """
-        if self.verbose:
-            print(f"⚠️  {message}")
+        self.manifest.record("warning", message=message)
     
     def info(self, message: str):
         """Log an info message.
@@ -180,28 +161,18 @@ class ProgressTracker:
         Args:
             message: Info message to display
         """
-        if self.verbose:
-            print(f"ℹ️  {message}")
+        self.manifest.record("info", message=message)
     
     def print_summary(self):
         """Print processing summary."""
-        if not self.verbose:
-            return
-        
-        print()
-        print("=" * 60)
-        print("📊 Processing Summary")
-        print("=" * 60)
-        print(f"Total PDFs found:    {self.stats.total}")
-        print(f"✅ Processed:        {self.stats.succeeded}")
-        print(f"⏭️  Skipped:         {self.stats.skipped}")
-        print(f"❌ Failed:           {self.stats.failed}")
-        print(f"🖼️  Images extracted: {self.stats.images_extracted}")
-        print(f"📊 Diagrams extracted: {self.stats.diagrams_extracted}")
-        print(f"⏱️  Duration:         {self.stats.duration}")
-        print(f"📈 Success rate:     {self.stats.success_rate:.1f}%")
-        
-        if self.stats.failed > 0:
-            print("\n⚠️  Some files failed. Check the error messages above.")
-        
-        print("\nDone! ✨")
+        self.manifest.set_summary(
+            total=self.stats.total,
+            succeeded=self.stats.succeeded,
+            failed=self.stats.failed,
+            skipped=self.stats.skipped,
+            images_extracted=self.stats.images_extracted,
+            diagrams_extracted=self.stats.diagrams_extracted,
+            duration=self.stats.duration,
+            success_rate=round(self.stats.success_rate, 1),
+            current_file=self._current_file,
+        )

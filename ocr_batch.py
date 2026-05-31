@@ -26,6 +26,7 @@ from src.config.settings import load_config
 from src.ocr.client import OCRClient
 from src.ocr.processors import PDFProcessor
 from src.utils.logging import ProgressTracker
+from src.utils.usage_tracker import UsageTracker
 
 
 def main():
@@ -35,54 +36,66 @@ def main():
         config = load_config()
         
         # Initialize progress tracker
-        tracker = ProgressTracker(verbose=config.verbose)
-        tracker.start()
-        tracker.set_input_output(
+        progress_tracker = ProgressTracker(verbose=config.verbose, run_name="ocr_batch")
+        progress_tracker.start()
+        progress_tracker.set_input_output(
             str(config.input_dir.absolute()),
             str(config.output_dir.absolute())
         )
         
-        # Initialize OCR client
+        # Initialize usage tracker
+        usage_tracker = UsageTracker()
+        usage_tracker.start()
+        
+        # Initialize OCR client with usage tracking
         client = OCRClient(
             api_key=config.api_key,
-            max_retries=config.max_retries
+            max_retries=config.max_retries,
+            usage_tracker=usage_tracker
         )
         
         # Initialize PDF processor
-        processor = PDFProcessor(client, config)
+        processor = PDFProcessor(client, config, progress_tracker=progress_tracker)
         
         # Find all PDF files in input directory
         pdf_files = list(config.input_dir.glob("*.pdf"))
-        tracker.set_total(len(pdf_files))
+        progress_tracker.set_total(len(pdf_files))
         
         if not pdf_files:
-            tracker.error("No PDF files found in input directory.")
+            progress_tracker.error("No PDF files found in input directory.")
             return
         
         # Process each PDF
         for pdf_file in sorted(pdf_files):
             filename = pdf_file.name
-            tracker.start_file(filename)
+            progress_tracker.start_file(filename)
             
             try:
                 result = processor.process(pdf_file)
                 
                 if result.success:
                     if hasattr(result, 'skipped') and result.skipped:
-                        tracker.skip_file(filename)
+                        progress_tracker.skip_file(filename)
                     else:
-                        tracker.complete_file(filename, success=True)
+                        progress_tracker.complete_file(filename, success=True)
                 else:
-                    tracker.complete_file(filename, success=False)
+                    progress_tracker.complete_file(filename, success=False)
                     if result.error:
-                        tracker.error(f"{filename}: {result.error}")
+                        progress_tracker.error(f"{filename}: {result.error}")
                 
             except Exception as e:
-                tracker.complete_file(filename, success=False)
-                tracker.error(f"{filename}: {str(e)}")
+                progress_tracker.complete_file(filename, success=False)
+                progress_tracker.error(f"{filename}: {str(e)}")
         
-        # Print summary
-        tracker.print_summary()
+        # End usage tracking
+        usage_tracker.end()
+        
+        # Print summaries
+        progress_tracker.print_summary()
+        usage_tracker.print_summary()
+        
+        # Save usage to file
+        usage_tracker.save_to_file(config.output_dir / "usage_stats.json")
         
     except KeyboardInterrupt:
         print("\n\n❌ Interrupted by user. Exiting...")

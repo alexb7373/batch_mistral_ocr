@@ -13,24 +13,29 @@ from src.utils.image_utils import ImageUtils
 class DiagramExtractor:
     """Extract diagrams from images as Mermaid or ASCII art.
     
-    Attempts to use diagram-specific OCR models first, then validates
-    the output to ensure it's actually a diagram (not just text).
+    Uses a vision model to either convert a diagram into Mermaid or
+    describe the image when it is not a diagram.
     
     Attributes:
         client: OCRClient instance
-        DIAGRAM_MODELS: List of models to try for diagram extraction
+        VISION_MODEL: Multimodal model used for image understanding
         MERMAID_PATTERNS: Regex patterns for detecting Mermaid syntax
         ASCII_PATTERNS: Regex patterns for detecting ASCII art
     """
     
-    DIAGRAM_MODELS: List[str] = [
-        "mistral-ocr-diagram-latest",
-        "mistral-diagram-latest",
-    ]
+    VISION_MODEL: str = "pixtral-12b-2409"
+    VISION_PROMPT: str = (
+        "Analyze this image from a document.\n"
+        "If it is a diagram, flowchart, UML, or similar structured image, "
+        "return valid Mermaid syntax only.\n"
+        "If it is not a diagram, return a concise plain-English description.\n"
+        "Do not use markdown fences or commentary."
+    )
     
     # Mermaid syntax patterns for detection
     MERMAID_PATTERNS: List[str] = [
         r'graph\s+(TD|LR|RL|TB)',      # Flowchart direction
+        r'flowchart\s+(TD|LR|RL|TB)', # Flowchart alias
         r'classDiagram',
         r'sequenceDiagram',
         r'stateDiagram',
@@ -38,6 +43,7 @@ class DiagramExtractor:
         r'pie',
         r'gantt',
         r'--->',                      # Arrow connections
+        r'---',                       # Simple arrow/line connections
         r'-->\s*\|',                 # Arrow with label
         r'\-\-\|',                   # Dashed connections
         r'\=\=',                      # Double line
@@ -96,21 +102,12 @@ class DiagramExtractor:
         Returns:
             Extracted diagram in Mermaid/ASCII format, or None if not a diagram
         """
-        # First check if image looks like a diagram
         if not ImageUtils.looks_like_diagram(image_path):
             return None
-        
-        # Try each diagram model
-        for model in self.DIAGRAM_MODELS:
-            try:
-                result = self._try_extract_with_model(image_path, model)
-                if result and self._is_valid_diagram(result):
-                    cleaned = self._clean_diagram_output(result)
-                    return cleaned
-            except Exception:
-                # Model doesn't exist or failed, try next one
-                continue
-        
+
+        result = self._analyze_image_path(image_path)
+        if result and self._is_valid_diagram(result):
+            return self._clean_diagram_output(result)
         return None
     
     def extract_from_base64(self, b64_data: str) -> Optional[str]:
@@ -122,45 +119,48 @@ class DiagramExtractor:
         Returns:
             Extracted diagram or None
         """
-        # Try each diagram model
-        for model in self.DIAGRAM_MODELS:
-            try:
-                result = self.client.process_image(b64_data, model=model)
-                if result.pages and len(result.pages) > 0:
-                    markdown = result.pages[0].markdown.strip()
-                    if markdown and self._is_valid_diagram(markdown):
-                        return self._clean_diagram_output(markdown)
-            except Exception:
-                continue
-        
+        result = self._analyze_base64(b64_data)
+        if result and self._is_valid_diagram(result):
+            return self._clean_diagram_output(result)
         return None
-    
-    def _try_extract_with_model(self, image_path: Path, model: str) -> str:
-        """Try extraction with a specific model.
+
+    def describe(self, image_path: Path) -> Optional[str]:
+        """Describe an image or convert it to Mermaid if it is diagram-like."""
+        return self._analyze_image_path(image_path)
+
+    def describe_from_base64(self, b64_data: str) -> Optional[str]:
+        """Describe an image or convert it to Mermaid if it is diagram-like."""
+        return self._analyze_base64(b64_data)
+
+    def is_diagram_text(self, text: str) -> bool:
+        """Public helper for checking whether generated text looks like a diagram."""
+        return self._is_valid_diagram(text)
+
+    def _analyze_image_path(self, image_path: Path) -> str:
+        """Analyze an image file with the vision model.
         
         Args:
             image_path: Path to image file
-            model: OCR model to use
         
         Returns:
-            Extracted text from OCR
+            Mermaid syntax or a concise description
         """
-        # Read and encode the image
         image_data = image_path.read_bytes()
         import base64
         encoded = base64.b64encode(image_data).decode("utf-8")
-        
-        # Detect format for proper MIME type
-        img_format = ImageUtils.detect_format(encoded)
-        data_url = f"data:{img_format.mime_type};base64,{encoded}"
-        
-        # Process with OCR
-        result = self.client.process_image(data_url, model=model)
-        
-        if result.pages and len(result.pages) > 0:
-            return result.pages[0].markdown
-        
-        return ""
+
+        return self._analyze_base64(encoded)
+
+    def _analyze_base64(self, b64_data: str) -> str:
+        """Analyze base64 image data with the vision model."""
+        try:
+            return self.client.describe_image(
+                b64_data,
+                prompt=self.VISION_PROMPT,
+                model=self.VISION_MODEL,
+            )
+        except Exception:
+            return ""
     
     def _is_valid_diagram(self, markdown: str) -> bool:
         """Check if result looks like a valid diagram.
@@ -174,10 +174,10 @@ class DiagramExtractor:
         Returns:
             True if it looks like a diagram, False otherwise
         """
-        if not markdown or len(markdown.strip()) < 20:
+        if not markdown:
             return False
-        
-        markdown_lower = markdown.lower()
+
+        markdown_stripped = markdown.strip()
         
         # Check for Mermaid syntax
         for pattern in self.MERMAID_PATTERNS:
@@ -188,6 +188,9 @@ class DiagramExtractor:
         for pattern in self.ASCII_PATTERNS:
             if re.search(pattern, markdown):
                 return True
+
+        if len(markdown_stripped) < 5:
+            return False
         
         # Additional heuristics: diagrams often have specific structures
         # Count occurrences of diagram-like elements

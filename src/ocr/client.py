@@ -10,6 +10,9 @@ from functools import wraps
 from mistralai.client import Mistral
 from mistralai.client.models import DocumentURLChunk, ImageURLChunk
 
+from ..utils.usage_tracker import UsageTracker, UsageInfo
+from src.utils.image_utils import ImageUtils
+
 
 class OCRClient:
     """Wrapper for Mistral OCR API with retry logic and error handling.
@@ -25,17 +28,20 @@ class OCRClient:
         retry_delay: Delay between retries in seconds
     """
     
-    def __init__(self, api_key: str, max_retries: int = 3, retry_delay: float = 1.0):
+    def __init__(self, api_key: str, max_retries: int = 3, retry_delay: float = 1.0, 
+                 usage_tracker: Optional[UsageTracker] = None):
         """Initialize OCR client.
         
         Args:
             api_key: Mistral API key
             max_retries: Maximum number of retry attempts (default: 3)
             retry_delay: Delay between retries in seconds (default: 1.0)
+            usage_tracker: Optional UsageTracker for accounting (default: None)
         """
         self.client = Mistral(api_key=api_key)
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        self.usage_tracker = usage_tracker
     
     def process_document(
         self,
@@ -56,12 +62,18 @@ class OCRClient:
         Raises:
             RuntimeError: If processing fails after all retries
         """
-        return self._retry_on_failure(
+        response = self._retry_on_failure(
             self._process_document_inner,
             document_url=document_url,
             model=model,
             include_image_base64=include_image_base64
         )
+        
+        # Track usage if tracker is configured
+        if self.usage_tracker:
+            self.usage_tracker.record_document_ocr(response, model)
+        
+        return response
     
     def _process_document_inner(
         self,
@@ -94,25 +106,68 @@ class OCRClient:
         Raises:
             RuntimeError: If processing fails after all retries
         """
-        # Create proper data URL
-        if "," in image_data:
-            header, data = image_data.split(",", 1)
-            # Extract mime type from header if present
-            if "base64," in header:
-                mime_type = header.split("base64,")[0].replace("data:", "")
-            else:
-                mime_type = "image/jpeg"
-                data = image_data
+        # Accept either raw base64 data or a full data URL.
+        if image_data.startswith("data:") and ";base64," in image_data:
+            image_url = image_data
         else:
-            mime_type = "image/jpeg"
-            data = image_data
+            img_format = ImageUtils.detect_format(image_data)
+            image_url = ImageUtils.create_data_url(img_format.mime_type, image_data)
         
-        image_url = f"data:{mime_type};base64,{data}"
-        
-        return self._retry_on_failure(
+        response = self._retry_on_failure(
             self._process_image_inner,
             image_url=image_url,
             model=model
+        )
+        
+        # Track usage if tracker is configured
+        if self.usage_tracker:
+            self.usage_tracker.record_image_ocr(response, model)
+        
+        return response
+
+    def describe_image(
+        self,
+        image_data: str,
+        prompt: str,
+        model: str = "pixtral-12b-2409",
+    ) -> str:
+        """Analyze an image with a multimodal chat model.
+
+        Args:
+            image_data: Base64 data or data URL for the image
+            prompt: Instruction for the vision model
+            model: Vision/chat model to use
+
+        Returns:
+            Generated text from the vision model
+        """
+        if image_data.startswith("data:") and ";base64," in image_data:
+            image_url = image_data
+        else:
+            img_format = ImageUtils.detect_format(image_data)
+            image_url = ImageUtils.create_data_url(img_format.mime_type, image_data)
+
+        response = self._retry_on_failure(
+            self._describe_image_inner,
+            image_url=image_url,
+            prompt=prompt,
+            model=model,
+        )
+        return self._extract_chat_content(response)
+
+    def _describe_image_inner(self, image_url: str, prompt: str, model: str) -> Any:
+        """Inner function for multimodal chat image analysis."""
+        return self.client.chat.complete(
+            model=model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": image_url},
+                    ],
+                }
+            ],
         )
     
     def _process_image_inner(self, image_url: str, model: str) -> Any:
@@ -123,6 +178,25 @@ class OCRClient:
             include_image_base64=False
         )
         return response
+
+    @staticmethod
+    def _extract_chat_content(response: Any) -> str:
+        """Extract message content from a chat completion response."""
+        try:
+            content = response.choices[0].message.content
+        except Exception:
+            return ""
+
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    parts.append(item.get("text", ""))
+                else:
+                    parts.append(str(item))
+            return "".join(parts).strip()
+
+        return str(content).strip()
     
     def upload_file(self, file_path: Path, purpose: str = "ocr") -> str:
         """Upload a file and return signed URL.

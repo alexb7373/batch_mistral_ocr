@@ -129,6 +129,32 @@ This architecture makes the code:
 
 ---
 
+## 🧪 Tests
+
+The repository has fast unit tests and an opt-in live end-to-end OCR test.
+
+Run the default test suite:
+
+```bash
+pytest -q
+```
+
+Run the live OCR pipeline tests only when you want to call the Mistral API:
+
+```bash
+RUN_LIVE_OCR_TESTS=1 pytest -q
+```
+
+The live tests use `tests/pdf/Refactoring Code to Load a Document.pdf` and exercise:
+
+- the single-file `PDFProcessor` pipeline
+- the folder-oriented `book_ocr.py --all` CLI path
+
+They are skipped unless `RUN_LIVE_OCR_TESTS=1` is set and `MISTRAL_API_KEY` is available.
+When they run, artifacts are written under `tests/live-ocr-output/` so you can inspect the generated markdown and images afterward.
+
+---
+
 ## 🚀 Run the Script
 
 ```bash
@@ -142,6 +168,45 @@ It will:
 - Save all detected images with their correct format (PNG, JPEG, etc.)
 - OCR image content and embed it in the markdown below the image reference
 - Provide a summary of processed, skipped, and failed files
+
+## 📚 OCR Books into the Workspace Library
+
+Use `book_ocr.py` when the input PDFs live in `../books` and the output should become a reusable markdown library.
+
+```bash
+python book_ocr.py ../books/whoNeedsArchitect.pdf
+```
+
+This writes:
+
+- Markdown to `../books/ocr/whoNeedsArchitect.md`
+- Extracted images to `../books/ocr/whoNeedsArchitect/`
+
+You can process every PDF directly under `../books`:
+
+```bash
+python book_ocr.py --all
+```
+
+You can also copy the generated markdown and companion image folder into the AI framework knowledge base so it can be used as project reference material:
+
+```bash
+python book_ocr.py ../books/whoNeedsArchitect.pdf --register-rag
+```
+
+The default RAG target is:
+
+```text
+../aiar-rdcz-1/ai-framework/knowledge-base/books/
+```
+
+Useful options:
+
+- `--force`: reprocess even if the markdown already exists
+- `--quiet`: reduce progress logging
+- `--books-dir PATH`: use a different source directory
+- `--output-dir PATH`: use a different OCR output directory
+- `--rag-dir PATH`: use a different knowledge-base target with `--register-rag`
 
 ---
 
