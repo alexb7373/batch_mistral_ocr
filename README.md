@@ -32,7 +32,10 @@ project-root/
 │   └── config.py            # Local path config (git-ignored)
 ├── pdfs/                    # Input folder for PDFs
 ├── output/                  # Output folder for markdown and images
-├── ocr_batch.py             # Thin CLI entry point
+├── ocr_batch.py             # Thin CLI entry point for the local pdfs/ workflow
+├── book_ocr.py              # Workspace-oriented CLI for ../books
+├── runtime/                 # Git-ignored run manifests
+├── tests/                   # Unit tests and live test fixtures
 ├── requirements.txt         # Python dependencies
 ├── AGENTS.md               # Agent-specific instructions
 └── README.md                # This file
@@ -54,7 +57,8 @@ The project follows SOLID principles with a modular architecture:
   - `file_utils.py`: File system operations
   - `image_utils.py`: Image format detection and processing
   - `logging.py`: Progress tracking and reporting
-- **`ocr_batch.py`**: Thin CLI entry point that orchestrates the modules
+- **`ocr_batch.py`**: Thin CLI entry point for the local `pdfs/` workflow
+- **`book_ocr.py`**: Workspace-oriented CLI with optional RAG registration
 
 This architecture makes the code:
 - ✅ Easier to test (each module can be tested in isolation)
@@ -216,6 +220,7 @@ Each output Markdown file contains:
 
 - `---filename_Page_N_start---` and `---filename_Page_N_end---` delimiters
 - `![]()` links to extracted images
+- Optional: `**Vision Extracted Description from image:**` or `**Vision Extracted Diagram from image:**`
 - Optional: `**OCR Extracted Text from image:**` section if image text is detected
 
 ---

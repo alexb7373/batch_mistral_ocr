@@ -9,6 +9,7 @@ pdfs/
 
 # Temporary files
 wkng/
+.wkng/
 runtime/
 tests/live-ocr-output/
 __pycache__

@@ -20,4 +20,5 @@ This ensures all dependencies (mistralai, python-dotenv) are available.
 ## Workflow
 
 1. Activate venv: `source ../.venv/bin/activate`
-2. Run script: `python ocr_batch.py`
+2. Run the local batch script: `python ocr_batch.py`
+3. Run the workspace/books CLI when needed: `python book_ocr.py --all`
