@@ -128,7 +128,11 @@ def detect_image_format(b64_data: str) -> tuple[str, str]:
 
 
 def ocr_image_to_text(image_path: Path) -> str:
-    """Perform OCR on a single image file."""
+    """Perform OCR on a single image file.
+    
+    Tries diagram extraction first (for flowcharts, UML, etc.),
+    then falls back to regular OCR for text/images.
+    """
     if not image_path.exists():
         print(f"⚠️  Image not found: {image_path}")
         return ""
@@ -141,8 +145,33 @@ def ocr_image_to_text(image_path: Path) -> str:
         mime_type, _ = detect_image_format(encoded_img)
         image_url = f"data:{mime_type};base64,{encoded_img}"
         
+        # Try diagram extraction first for flowcharts, UML, architecture diagrams
+        diagram_models = ["mistral-ocr-diagram-latest", "mistral-diagram-latest"]
+        regular_model = "mistral-ocr-latest"
+        
+        # Attempt diagram models first
+        for model_name in diagram_models:
+            try:
+                response = client.ocr.process(
+                    model=model_name,
+                    document=ImageURLChunk(image_url=image_url),
+                    include_image_base64=False
+                )
+                
+                if response.pages and len(response.pages) > 0:
+                    markdown = response.pages[0].markdown.strip()
+                    if markdown and len(markdown) > 10:  # Only use if we got meaningful output
+                        # Clean up any self-referencing image links
+                        markdown = re.sub(r'\[.*?\]\(.*?\)', '', markdown)
+                        print(f"  📊 Extracted diagram from {image_path.name} using {model_name}")
+                        return "\n" + markdown + "\n"
+            except Exception:
+                # This model doesn't exist or failed, try next one
+                continue
+        
+        # Fall back to regular OCR
         response = client.ocr.process(
-            model="mistral-ocr-latest",
+            model=regular_model,
             document=ImageURLChunk(image_url=image_url),
             include_image_base64=False
         )
@@ -260,7 +289,7 @@ def process_pdf(pdf_path: Path) -> bool:
                                     f"![]({base_filename}/{img_filename})"
                                 )
                         
-                        # Perform OCR on the image
+                        # Perform OCR on the image (tries diagram extraction first)
                         ocr_text = ocr_image_to_text(img_path)
                         if ocr_text and ocr_text.strip():
                             # Clean up the OCR text
