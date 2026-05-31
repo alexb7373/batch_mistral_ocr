@@ -8,7 +8,6 @@ Examples:
 """
 
 import argparse
-import shutil
 import sys
 from pathlib import Path
 
@@ -19,8 +18,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.config.settings import AppConfig, load_api_key
 from src.ocr.client import OCRClient
-from src.ocr.processors import PDFProcessor
-from src.utils.logging import ProgressTracker
+from src.utils.batch_runner import run_pdf_batch
+from src.utils.usage_tracker import UsageTracker
 
 
 DEFAULT_BOOKS_DIR = WORKSPACE_ROOT / "books"
@@ -45,24 +44,14 @@ def _selected_pdfs(args: argparse.Namespace, books_dir: Path) -> list[Path]:
     return [_resolve_pdf(Path(pdf), books_dir) for pdf in args.pdfs]
 
 
-def _build_config(output_dir: Path, force: bool, verbose: bool) -> AppConfig:
+def _build_config(books_dir: Path, output_dir: Path, force: bool, verbose: bool) -> AppConfig:
     return AppConfig(
-        input_dir=DEFAULT_BOOKS_DIR,
+        input_dir=books_dir,
         output_dir=output_dir,
         api_key=load_api_key(),
         force_reprocess=force,
         verbose=verbose,
     )
-
-
-def _register_for_rag(markdown_path: Path, rag_dir: Path) -> Path:
-    rag_dir.mkdir(parents=True, exist_ok=True)
-    target = rag_dir / markdown_path.name
-    shutil.copy2(markdown_path, target)
-    image_dir = markdown_path.parent / markdown_path.stem
-    if image_dir.exists():
-        shutil.copytree(image_dir, rag_dir / image_dir.name, dirs_exist_ok=True)
-    return target
 
 
 def parse_args() -> argparse.Namespace:
@@ -101,34 +90,28 @@ def main() -> int:
             print(f"No PDF files found in {books_dir}")
             return 1
 
-        config = _build_config(output_dir, force=args.force, verbose=not args.quiet)
-        tracker = ProgressTracker(verbose=config.verbose, run_name="book_ocr")
-        tracker.start()
-        tracker.set_input_output(str(books_dir), str(output_dir))
-        tracker.set_total(len(pdfs))
+        config = _build_config(books_dir, output_dir, force=args.force, verbose=not args.quiet)
+        usage_tracker = UsageTracker()
+        usage_tracker.start()
 
-        client = OCRClient(api_key=config.api_key, max_retries=config.max_retries)
-        processor = PDFProcessor(client, config, progress_tracker=tracker)
-        rag_targets: list[Path] = []
+        client = OCRClient(
+            api_key=config.api_key,
+            max_retries=config.max_retries,
+            usage_tracker=usage_tracker,
+        )
+        result = run_pdf_batch(
+            pdfs,
+            config,
+            client,
+            run_name="book_ocr",
+            register_rag_targets=args.register_rag,
+            rag_dir=rag_dir,
+            usage_tracker=usage_tracker,
+        )
 
-        for pdf_path in pdfs:
-            tracker.start_file(pdf_path.name)
-            result = processor.process(pdf_path)
-            if result.success:
-                if result.skipped:
-                    tracker.skip_file(pdf_path.name)
-                else:
-                    tracker.complete_file(pdf_path.name, success=True)
-                if args.register_rag and result.output_path:
-                    rag_targets.append(_register_for_rag(result.output_path, rag_dir))
-            else:
-                tracker.complete_file(pdf_path.name, success=False)
-                tracker.error(f"{pdf_path.name}: {result.error}")
-
-        tracker.print_summary()
-        if rag_targets:
+        if result.rag_targets:
             print("\nRegistered for RAG:")
-            for target in rag_targets:
+            for target in result.rag_targets:
                 print(f"  {target}")
         return 0
     except KeyboardInterrupt:
