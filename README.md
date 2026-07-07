@@ -173,6 +173,16 @@ It will:
 - OCR image content and embed it in the markdown below the image reference
 - Provide a summary of processed, skipped, and failed files
 
+## 🌍 Translate OCR Markdown to English
+
+If you already have OCR markdown and want an English version that preserves Markdown structure and LaTeX math, use the translation helper:
+
+```bash
+python translate_markdown.py output/6a453e7982cf1245294572.md -o output/6a453e7982cf1245294572.en.md
+```
+
+By default this uses Mistral’s `mistral-small-latest` chat model. You can override it with `--model`.
+
 ## 📚 OCR Books into the Workspace Library
 
 Use `book_ocr.py` when the input PDFs live in `../books` and the output should become a reusable markdown library.
