@@ -32,8 +32,7 @@ project-root/
 │   └── config.py            # Local path config (git-ignored)
 ├── pdfs/                    # Input folder for PDFs
 ├── output/                  # Output folder for markdown and images
-├── ocr_batch.py             # Thin CLI entry point for the local pdfs/ workflow
-├── book_ocr.py              # Workspace-oriented CLI for ../books
+├── src/cli/                 # CLI entrypoints for OCR and translation
 ├── runtime/                 # Git-ignored run manifests
 ├── tests/                   # Unit tests and live test fixtures
 ├── requirements.txt         # Python dependencies
@@ -57,8 +56,9 @@ The project follows SOLID principles with a modular architecture:
   - `file_utils.py`: File system operations
   - `image_utils.py`: Image format detection and processing
   - `logging.py`: Progress tracking and reporting
-- **`ocr_batch.py`**: Thin CLI entry point for the local `pdfs/` workflow
-- **`book_ocr.py`**: Workspace-oriented CLI with optional RAG registration
+- **`src/cli/ocr_batch.py`**: Thin CLI entry point for the local `pdfs/` workflow
+- **`src/cli/book_ocr.py`**: Workspace-oriented CLI with optional RAG registration
+- **`src/cli/translate_markdown.py`**: Markdown translation helper that preserves page markers and math
 
 This architecture makes the code:
 - ✅ Easier to test (each module can be tested in isolation)
@@ -152,7 +152,7 @@ RUN_LIVE_OCR_TESTS=1 pytest -q
 The live tests use `tests/pdf/Refactoring Code to Load a Document.pdf` and exercise:
 
 - the single-file `PDFProcessor` pipeline
-- the folder-oriented `book_ocr.py --all` CLI path
+- the folder-oriented `python -m src.cli.book_ocr --all` CLI path
 
 They are skipped unless `RUN_LIVE_OCR_TESTS=1` is set and `MISTRAL_API_KEY` is available.
 When they run, artifacts are written under `tests/live-ocr-output/` so you can inspect the generated markdown and images afterward.
@@ -162,7 +162,7 @@ When they run, artifacts are written under `tests/live-ocr-output/` so you can i
 ## 🚀 Run the Script
 
 ```bash
-python ocr_batch.py
+python -m src.cli.ocr_batch
 ```
 
 It will:
@@ -178,17 +178,17 @@ It will:
 If you already have OCR markdown and want an English version that preserves Markdown structure and LaTeX math, use the translation helper:
 
 ```bash
-python translate_markdown.py output/6a453e7982cf1245294572.md -o output/6a453e7982cf1245294572.en.md
+python -m src.cli.translate_markdown output/6a453e7982cf1245294572.md -o output/6a453e7982cf1245294572.en.md
 ```
 
 By default this uses Mistral’s `mistral-small-latest` chat model. You can override it with `--model`.
 
 ## 📚 OCR Books into the Workspace Library
 
-Use `book_ocr.py` when the input PDFs live in `../books` and the output should become a reusable markdown library.
+Use `src.cli.book_ocr` when the input PDFs live in `../books` and the output should become a reusable markdown library.
 
 ```bash
-python book_ocr.py ../books/whoNeedsArchitect.pdf
+python -m src.cli.book_ocr ../books/whoNeedsArchitect.pdf
 ```
 
 This writes:
@@ -199,13 +199,13 @@ This writes:
 You can process every PDF directly under `../books`:
 
 ```bash
-python book_ocr.py --all
+python -m src.cli.book_ocr --all
 ```
 
 You can also copy the generated markdown and companion image folder into the AI framework knowledge base so it can be used as project reference material:
 
 ```bash
-python book_ocr.py ../books/whoNeedsArchitect.pdf --register-rag
+python -m src.cli.book_ocr ../books/whoNeedsArchitect.pdf --register-rag
 ```
 
 The default RAG target is:

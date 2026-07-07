@@ -159,7 +159,8 @@ def test_live_pipeline_folder_cli(project_root: Path) -> None:
     completed = subprocess.run(
         [
             sys.executable,
-            str(project_root / "book_ocr.py"),
+            "-m",
+            "src.cli.book_ocr",
             "--books-dir",
             str(source_dir),
             "--output-dir",
@@ -176,7 +177,7 @@ def test_live_pipeline_folder_cli(project_root: Path) -> None:
 
     if completed.returncode != 0:
         pytest.fail(
-            "book_ocr.py failed\n"
+            "src.cli.book_ocr failed\n"
             f"stdout:\n{completed.stdout}\n"
             f"stderr:\n{completed.stderr}"
         )

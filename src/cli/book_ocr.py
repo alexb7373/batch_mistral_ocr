@@ -3,18 +3,15 @@
 OCR book PDFs from ../books into ../books/ocr.
 
 Examples:
-    python book_ocr.py ../books/whoNeedsArchitect.pdf
-    python book_ocr.py --all --register-rag
+    python -m src.cli.book_ocr ../books/whoNeedsArchitect.pdf
+    python -m src.cli.book_ocr --all --register-rag
 """
+
+from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
-
-PROJECT_ROOT = Path(__file__).parent
-WORKSPACE_ROOT = PROJECT_ROOT.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config.settings import AppConfig, load_api_key
 from src.ocr.client import OCRClient
@@ -22,6 +19,8 @@ from src.utils.batch_runner import run_pdf_batch
 from src.utils.usage_tracker import UsageTracker
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+WORKSPACE_ROOT = PROJECT_ROOT.parent
 DEFAULT_BOOKS_DIR = WORKSPACE_ROOT / "books"
 DEFAULT_OCR_DIR = DEFAULT_BOOKS_DIR / "ocr"
 DEFAULT_RAG_DIR = WORKSPACE_ROOT / "aiar-rdcz-1" / "ai-framework" / "knowledge-base" / "books"
@@ -124,3 +123,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

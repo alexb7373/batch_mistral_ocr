@@ -13,6 +13,7 @@ wkng/
 runtime/
 tests/live-ocr-output/
 __pycache__
+.pytest_cache/
 
 # Environment files
 .env
